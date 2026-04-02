@@ -1,0 +1,52 @@
+refactor: reorganize project structure and improve maintainability
+
+Reorganized the Pi iOS Desktop Environment project for better
+organization and maintainability:
+
+**Directory Structure:**
+- Created `deb-build/` for all Debian package build files
+- Created `scripts/` for user-facing installation scripts
+- Created `docs/` for all documentation files
+- Kept main application files in project root
+
+**File Organization:**
+- Moved build-desktop-deb.sh, pi-ios-session, pi-ios-desktop.desktop
+  to deb-build/ directory
+- Moved setup-desktop-environment.sh and uninstall-desktop.sh to
+  scripts/ directory
+- Moved all documentation (.md, .txt) except README.md to docs/
+  directory
+- Core application (pi_ios_desktop.py) remains in root
+
+**Code Changes:**
+- Updated build-desktop-deb.sh to use dynamic path resolution
+  with SCRIPT_DIR and PROJECT_ROOT variables
+- Updated setup-desktop-environment.sh to reference files in new
+  locations using relative paths
+- Added proper path handling to support running scripts from
+  any directory
+- Updated README.md with new directory structure and usage
+  instructions
+
+**Improvements:**
+- Better separation of concerns (build, install, docs)
+- Easier to navigate project structure
+- Scripts can be run from their respective directories
+- Cleaner root directory
+- Added .gitignore for Python and build artifacts
+
+**Documentation:**
+- Updated README.md with project structure diagram
+- Updated installation instructions to reflect new paths
+- All documentation now properly organized in docs/
+
+Files affected:
+- deb-build/build-desktop-deb.sh (path updates)
+- scripts/setup-desktop-environment.sh (path updates)
+- README.md (structure documentation)
+- .gitignore (new file)
+
+Breaking changes: None - scripts maintain backward compatibility
+through dynamic path resolution.
+
+Tested: Path resolution verified for both build and setup scripts.

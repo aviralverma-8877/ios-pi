@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(chmod +x *.sh *.py pi-ios-session)",
+      "Bash(mv DESKTOP-README.md README.md)",
+      "Bash(mv DESKTOP-QUICKSTART.md QUICKSTART.md)",
+      "Bash(python3 -m py_compile pi_ios_desktop.py)",
+      "Bash(bash -n deb-build/build-desktop-deb.sh)",
+      "Bash(bash -n scripts/setup-desktop-environment.sh)",
+      "Bash(bash -n scripts/uninstall-desktop.sh)"
+    ],
+    "additionalDirectories": [
+      "c:\\Users\\aviralv\\Documents\\CHROT\\pi 4.3 display"
+    ]
+  }
+}

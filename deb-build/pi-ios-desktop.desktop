@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=Pi iOS Desktop
+Comment=iOS-like Desktop Environment for Raspberry Pi
+Exec=/usr/bin/pi-ios-desktop
+TryExec=/usr/bin/pi-ios-desktop
+Icon=computer
+Type=Application
+DesktopNames=PIOS
+X-Ubuntu-Gettext-Domain=pi-ios-desktop

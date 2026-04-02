@@ -19,6 +19,7 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+MANIFEST
 
 # Debian packaging
 debian-pkg/
@@ -30,10 +31,11 @@ debian-pkg/
 *.swp
 *.swo
 *~
-
-# OS
 .DS_Store
-Thumbs.db
 
 # Logs
 *.log
+
+# Test files
+test_*.py
+*_test.py

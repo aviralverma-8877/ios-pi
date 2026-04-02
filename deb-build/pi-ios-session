@@ -1,0 +1,32 @@
+#!/bin/bash
+#
+# Pi iOS Desktop Session
+# X session wrapper for Pi iOS Desktop Environment
+#
+
+# Set environment
+export XDG_CURRENT_DESKTOP=PIOS
+export XDG_SESSION_DESKTOP=pi-ios
+export DESKTOP_SESSION=pi-ios
+
+# Disable screensaver
+xset s off 2>/dev/null || true
+xset -dpms 2>/dev/null || true
+xset s noblank 2>/dev/null || true
+
+# Set background (in case DE doesn't start)
+xsetroot -solid '#667eea' 2>/dev/null || true
+
+# Start window manager (lightweight fallback)
+# This ensures basic window management if apps open new windows
+openbox &
+WM_PID=$!
+
+# Wait a moment for WM to start
+sleep 1
+
+# Start the desktop environment
+/usr/bin/pi-ios-desktop
+
+# Clean up when desktop exits
+kill $WM_PID 2>/dev/null || true
