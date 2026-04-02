@@ -8,27 +8,30 @@ A complete iOS-like desktop environment for Raspberry Pi that boots directly int
 
 ## What's This?
 
-A **full desktop environment** that:
-- ✅ Boots directly into iOS-like interface
+A **full GNOME-like desktop environment** that:
+- ✅ Boots directly into iOS-styled desktop shell
+- ✅ Top panel with Activities and system tray
+- ✅ Desktop background area
+- ✅ Dock with favorite applications
+- ✅ Application launcher overlay
+- ✅ Proper window management
 - ✅ Replaces the default LXDE desktop
-- ✅ Appears in the login screen session selector
-- ✅ Manages windows and applications
-- ✅ Provides complete desktop functionality
 
 ## Features
 
-### 🖥️ Full Desktop Environment
-- Boots directly into iOS-style interface
-- Selectable from login screen
-- Window management for external apps
-- System-wide integration
+### 🖥️ GNOME-Like Desktop Shell
+- **Top Panel**: Activities button, app title, system indicators, power menu
+- **Desktop Area**: Full desktop background (not fullscreen app)
+- **Dock**: macOS/Ubuntu-style dock with favorite apps at bottom
+- **Window Management**: Apps open as proper windows, not fullscreen
+- **Activities Overview**: Application launcher with search
 
-### 📱 iOS-Style Interface
-- App grid with touch-optimized icons
-- Status bar with time and system info
-- Home button (press to return)
-- App dock for quick access
-- Smooth transitions
+### 📱 iOS-Styled Interface
+- Beautiful gradient desktop background
+- Touch-optimized buttons and panels
+- Smooth animations and transitions
+- Modern, clean design language
+- Consistent iOS-inspired aesthetics
 
 ### 🛠️ Built-in Applications
 - **File Manager**: Browse and open files

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Pi iOS Desktop Environment - Complete desktop environment for Raspberry Pi
-Boot directly into iOS-like interface
+Pi iOS Desktop Environment - GNOME-like desktop environment for Raspberry Pi
+Provides a complete desktop shell with panels, desktop, and window management
 """
 
 import sys
@@ -12,236 +12,315 @@ from datetime import datetime
 from PyQt5.QtWidgets import (QApplication, QDesktopWidget, QWidget, QGridLayout,
                              QPushButton, QLabel, QVBoxLayout, QHBoxLayout,
                              QStackedWidget, QScrollArea, QFrame, QListWidget,
-                             QTextEdit, QLineEdit, QMessageBox, QMenu, QSystemTrayIcon)
-from PyQt5.QtCore import Qt, QTimer, QSize, QPoint, QProcess, pyqtSignal
+                             QTextEdit, QLineEdit, QMessageBox, QMenu, QDialog,
+                             QFileDialog, QSystemTrayIcon)
+from PyQt5.QtCore import Qt, QTimer, QSize, QPoint, QProcess, pyqtSignal, QRect
 from PyQt5.QtGui import QFont, QIcon, QPalette, QColor, QCursor, QPixmap, QPainter
 
-class WindowManager:
-    """Simple window manager to track and manage application windows"""
-    def __init__(self):
-        self.windows = []
-        self.active_window = None
+class TopPanel(QWidget):
+    """GNOME-like top panel with activities and system tray"""
 
-    def add_window(self, process, name):
-        self.windows.append({'process': process, 'name': name, 'pid': process.pid()})
+    show_activities = pyqtSignal()
 
-    def remove_window(self, process):
-        self.windows = [w for w in self.windows if w['process'] != process]
-
-    def kill_all(self):
-        for window in self.windows:
-            try:
-                window['process'].kill()
-            except:
-                pass
-
-class StatusBar(QWidget):
-    """iOS-like status bar with system info"""
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setFixedHeight(30)
+        self.setFixedHeight(35)
         self.setStyleSheet("""
             QWidget {
-                background-color: rgba(0, 0, 0, 180);
+                background-color: rgba(0, 0, 0, 200);
                 color: white;
+            }
+            QPushButton {
+                background-color: transparent;
+                border: none;
+                color: white;
+                padding: 5px 15px;
+                font-size: 12px;
+            }
+            QPushButton:hover {
+                background-color: rgba(255, 255, 255, 50);
+                border-radius: 4px;
             }
         """)
 
         layout = QHBoxLayout()
-        layout.setContentsMargins(10, 0, 10, 0)
+        layout.setContentsMargins(8, 0, 8, 0)
+        layout.setSpacing(10)
 
-        # Time label
+        # Activities button (left)
+        self.activities_btn = QPushButton("🏠 Activities")
+        self.activities_btn.clicked.connect(self.show_activities.emit)
+        self.activities_btn.setCursor(Qt.PointingHandCursor)
+        layout.addWidget(self.activities_btn)
+
+        # Application title (center)
+        self.title_label = QLabel("Pi iOS Desktop")
+        self.title_label.setAlignment(Qt.AlignCenter)
+        self.title_label.setFont(QFont("Arial", 10, QFont.Bold))
+        layout.addWidget(self.title_label, stretch=1)
+
+        # System indicators (right)
+        self.system_info = QLabel()
+        self.system_info.setFont(QFont("Arial", 9))
+        layout.addWidget(self.system_info)
+
+        # Time/Date
         self.time_label = QLabel()
         self.time_label.setFont(QFont("Arial", 10, QFont.Bold))
-
-        # System info
-        self.system_label = QLabel()
-        self.system_label.setFont(QFont("Arial", 9))
-
-        # Status indicators
-        self.status_label = QLabel("⚡ 🌡️ 📡")
-        self.status_label.setFont(QFont("Arial", 10))
-
         layout.addWidget(self.time_label)
-        layout.addWidget(self.system_label)
-        layout.addStretch()
-        layout.addWidget(self.status_label)
+
+        # Power button
+        self.power_btn = QPushButton("⏻")
+        self.power_btn.setFixedSize(30, 30)
+        self.power_btn.setFont(QFont("Arial", 14))
+        self.power_btn.setCursor(Qt.PointingHandCursor)
+        layout.addWidget(self.power_btn)
 
         self.setLayout(layout)
 
-        # Update every second
+        # Update timer
         self.timer = QTimer()
         self.timer.timeout.connect(self.update_info)
         self.timer.start(1000)
         self.update_info()
 
     def update_info(self):
-        current_time = datetime.now().strftime("%H:%M:%S")
+        # Update time
+        current_time = datetime.now().strftime("%H:%M")
         self.time_label.setText(current_time)
 
-        # Get system info
+        # Update system info
         try:
-            # CPU temp
             with open('/sys/class/thermal/thermal_zone0/temp', 'r') as f:
                 temp = int(f.read().strip()) / 1000
-                self.system_label.setText(f" {temp:.0f}°C")
+                self.system_info.setText(f"🌡️ {temp:.0f}°C")
         except:
-            self.system_label.setText("")
+            self.system_info.setText("")
 
-class AppIcon(QPushButton):
-    """iOS-style app icon button"""
-    def __init__(self, name, icon_text, callback, parent=None):
+class DesktopArea(QWidget):
+    """Desktop background area - like GNOME desktop"""
+
+    def __init__(self, parent=None):
         super().__init__(parent)
-        self.app_name = name
-        self.callback = callback
-
-        self.setFixedSize(80, 100)
-        self.setText(f"{icon_text}\n{name}")
-        self.setFont(QFont("Arial", 10))
         self.setStyleSheet("""
-            QPushButton {
-                background-color: rgba(255, 255, 255, 200);
+            QWidget {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                    stop:0 #667eea, stop:1 #764ba2);
+            }
+        """)
+
+class Dock(QWidget):
+    """macOS/Ubuntu-like dock at bottom"""
+
+    app_launched = pyqtSignal(str)
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setFixedHeight(70)
+        self.setStyleSheet("""
+            QWidget {
+                background-color: rgba(255, 255, 255, 180);
                 border-radius: 15px;
-                color: black;
-                padding: 5px;
+            }
+            QPushButton {
+                background-color: rgba(255, 255, 255, 150);
                 border: 2px solid rgba(255, 255, 255, 100);
+                border-radius: 12px;
+                color: black;
+                font-size: 20px;
+                padding: 5px;
             }
             QPushButton:hover {
                 background-color: rgba(255, 255, 255, 220);
+                border: 2px solid rgba(100, 100, 255, 150);
             }
             QPushButton:pressed {
                 background-color: rgba(200, 200, 200, 200);
             }
         """)
 
-        self.clicked.connect(self.on_click)
+        layout = QHBoxLayout()
+        layout.setContentsMargins(10, 5, 10, 5)
+        layout.setSpacing(10)
 
-    def on_click(self):
-        if self.callback:
-            self.callback(self.app_name)
+        # Dock apps with icons
+        dock_apps = [
+            ("Files", "📁"),
+            ("Terminal", "💻"),
+            ("Browser", "🌐"),
+            ("Settings", "⚙️"),
+            ("Apps", "⚡"),
+        ]
 
-class HomePage(QWidget):
-    """iOS-like home screen"""
-    def __init__(self, launch_callback, parent=None):
+        for app_name, icon in dock_apps:
+            btn = QPushButton(icon)
+            btn.setFixedSize(55, 55)
+            btn.setToolTip(app_name)
+            btn.setCursor(Qt.PointingHandCursor)
+            btn.clicked.connect(lambda checked, name=app_name: self.app_launched.emit(name))
+            layout.addWidget(btn)
+
+        self.setLayout(layout)
+
+class ApplicationLauncher(QDialog):
+    """Application launcher overlay - like GNOME Activities"""
+
+    app_selected = pyqtSignal(str)
+
+    def __init__(self, parent=None):
         super().__init__(parent)
-        self.launch_callback = launch_callback
+        self.setWindowFlags(Qt.FramelessWindowHint | Qt.Dialog)
+        self.setModal(True)
+        self.setStyleSheet("""
+            QDialog {
+                background-color: rgba(0, 0, 0, 220);
+            }
+            QLineEdit {
+                background-color: white;
+                border: 2px solid #667eea;
+                border-radius: 8px;
+                padding: 10px;
+                font-size: 14px;
+            }
+            QPushButton {
+                background-color: rgba(255, 255, 255, 200);
+                border-radius: 15px;
+                border: 2px solid rgba(255, 255, 255, 100);
+                color: black;
+                padding: 10px;
+                font-size: 12px;
+            }
+            QPushButton:hover {
+                background-color: rgba(255, 255, 255, 255);
+                border: 2px solid #667eea;
+            }
+        """)
 
-        main_layout = QVBoxLayout()
-        main_layout.setContentsMargins(20, 20, 20, 80)
-        main_layout.setSpacing(20)
+        layout = QVBoxLayout()
+        layout.setContentsMargins(50, 50, 50, 50)
+        layout.setSpacing(20)
 
-        # Scrollable app grid
+        # Search box
+        self.search = QLineEdit()
+        self.search.setPlaceholderText("🔍 Search applications...")
+        self.search.setFixedHeight(50)
+        self.search.textChanged.connect(self.filter_apps)
+        layout.addWidget(self.search)
+
+        # App grid
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setStyleSheet("QScrollArea { border: none; background: transparent; }")
 
         container = QWidget()
-        grid_layout = QGridLayout()
-        grid_layout.setSpacing(15)
+        self.grid_layout = QGridLayout()
+        self.grid_layout.setSpacing(15)
 
-        # System apps
-        apps = [
-            ("Terminal", "💻", self.launch_callback),
-            ("Files", "📁", self.launch_callback),
-            ("Browser", "🌐", self.launch_callback),
-            ("Settings", "⚙️", self.launch_callback),
-            ("Calculator", "🔢", self.launch_callback),
-            ("Text Editor", "📝", self.launch_callback),
-            ("Task Manager", "📊", self.launch_callback),
-            ("System Info", "ℹ️", self.launch_callback),
-            ("Screenshot", "📷", self.launch_callback),
-            ("Music", "🎵", self.launch_callback),
-            ("Videos", "🎬", self.launch_callback),
-            ("Images", "🖼️", self.launch_callback),
-            ("Network", "📡", self.launch_callback),
-            ("Power", "🔋", self.launch_callback),
-            ("Shutdown", "⏻", self.launch_callback),
+        # All available apps
+        self.all_apps = [
+            ("Files", "📁", "file manager"),
+            ("Terminal", "💻", "terminal console"),
+            ("Browser", "🌐", "web browser"),
+            ("Text Editor", "📝", "text editor"),
+            ("Calculator", "🔢", "calculator math"),
+            ("Settings", "⚙️", "settings configuration"),
+            ("System Info", "ℹ️", "system information"),
+            ("Images", "🖼️", "image viewer photos"),
+            ("Music", "🎵", "music player audio"),
+            ("Videos", "🎬", "video player movies"),
+            ("Calendar", "📅", "calendar date"),
+            ("Mail", "✉️", "email mail"),
+            ("Clock", "⏰", "clock time alarm"),
+            ("Weather", "🌤️", "weather forecast"),
+            ("Notes", "📋", "notes notepad"),
+            ("Camera", "📷", "camera photo"),
+            ("Maps", "🗺️", "maps navigation"),
+            ("Store", "🛍️", "app store software"),
+            ("Power", "⏻", "power shutdown reboot"),
         ]
 
-        # 3 columns for 4.3" display
+        self.app_buttons = []
+        self.populate_apps()
+
+        container.setLayout(self.grid_layout)
+        scroll.setWidget(container)
+        layout.addWidget(scroll)
+
+        self.setLayout(layout)
+
+    def populate_apps(self, filter_text=""):
+        # Clear existing
+        for btn in self.app_buttons:
+            btn.deleteLater()
+        self.app_buttons.clear()
+
+        # Filter apps
+        filtered_apps = [
+            app for app in self.all_apps
+            if filter_text.lower() in app[0].lower() or filter_text.lower() in app[2]
+        ] if filter_text else self.all_apps
+
+        # Add apps to grid (4 columns)
         row, col = 0, 0
-        for app_name, icon, callback in apps:
-            app_icon = AppIcon(app_name, icon, callback)
-            grid_layout.addWidget(app_icon, row, col)
+        for app_name, icon, keywords in filtered_apps:
+            btn = QPushButton(f"{icon}\n{app_name}")
+            btn.setFixedSize(100, 100)
+            btn.setCursor(Qt.PointingHandCursor)
+            btn.clicked.connect(lambda checked, name=app_name: self.launch_app(name))
+            self.grid_layout.addWidget(btn, row, col)
+            self.app_buttons.append(btn)
+
             col += 1
-            if col >= 3:
+            if col >= 4:
                 col = 0
                 row += 1
 
-        container.setLayout(grid_layout)
-        scroll.setWidget(container)
-        main_layout.addWidget(scroll)
+    def filter_apps(self, text):
+        self.populate_apps(text)
 
-        # Dock
-        dock = self.create_dock()
-        main_layout.addWidget(dock)
+    def launch_app(self, app_name):
+        self.app_selected.emit(app_name)
+        self.close()
 
-        self.setLayout(main_layout)
+    def keyPressEvent(self, event):
+        if event.key() == Qt.Key_Escape:
+            self.close()
 
-    def create_dock(self):
-        """Create app dock"""
-        dock = QFrame()
-        dock.setFixedHeight(70)
-        dock.setStyleSheet("""
-            QFrame {
-                background-color: rgba(255, 255, 255, 150);
-                border-radius: 20px;
-            }
-        """)
+    def showEvent(self, event):
+        super().showEvent(event)
+        self.search.setFocus()
+        self.search.clear()
+        self.populate_apps()
 
-        layout = QHBoxLayout()
-        layout.setContentsMargins(10, 5, 10, 5)
+class FileManagerWindow(QWidget):
+    """Standalone file manager window"""
 
-        # Quick access apps
-        dock_apps = [
-            ("Terminal", "💻", self.launch_callback),
-            ("Files", "📁", self.launch_callback),
-            ("Browser", "🌐", self.launch_callback),
-        ]
-
-        for app_name, icon, callback in dock_apps:
-            btn = AppIcon(app_name, icon, callback)
-            btn.setFixedSize(60, 60)
-            layout.addWidget(btn)
-
-        dock.setLayout(layout)
-        return dock
-
-class FileManager(QWidget):
-    """File manager app"""
-    def __init__(self, parent=None):
-        super().__init__(parent)
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("Files")
+        self.setGeometry(100, 100, 600, 400)
+        self.setWindowFlags(Qt.Window)
 
         layout = QVBoxLayout()
 
-        # Current path
-        self.path_label = QLabel("/home/pi")
-        self.path_label.setStyleSheet("QLabel { background: white; padding: 5px; border-radius: 5px; }")
-        layout.addWidget(self.path_label)
+        # Path bar
+        path_layout = QHBoxLayout()
+        self.path_label = QLabel(os.path.expanduser("~"))
+        self.path_label.setStyleSheet("padding: 5px; background: white; border-radius: 4px;")
+        back_btn = QPushButton("⬅️")
+        back_btn.clicked.connect(self.go_back)
+        home_btn = QPushButton("🏠")
+        home_btn.clicked.connect(self.go_home)
+        path_layout.addWidget(back_btn)
+        path_layout.addWidget(home_btn)
+        path_layout.addWidget(self.path_label, stretch=1)
+        layout.addLayout(path_layout)
 
         # File list
         self.file_list = QListWidget()
-        self.file_list.setStyleSheet("""
-            QListWidget {
-                background: white;
-                border-radius: 10px;
-                padding: 5px;
-                font-size: 12px;
-            }
-        """)
+        self.file_list.setStyleSheet("background: white; font-size: 12px;")
         self.file_list.itemDoubleClicked.connect(self.open_item)
         layout.addWidget(self.file_list)
-
-        # Buttons
-        btn_layout = QHBoxLayout()
-        back_btn = QPushButton("⬅️ Back")
-        back_btn.clicked.connect(self.go_back)
-        home_btn = QPushButton("🏠 Home")
-        home_btn.clicked.connect(self.go_home)
-
-        btn_layout.addWidget(back_btn)
-        btn_layout.addWidget(home_btn)
-        layout.addLayout(btn_layout)
 
         self.setLayout(layout)
         self.current_path = os.path.expanduser("~")
@@ -252,13 +331,11 @@ class FileManager(QWidget):
         self.path_label.setText(self.current_path)
 
         try:
-            items = os.listdir(self.current_path)
-            for item in sorted(items):
+            items = sorted(os.listdir(self.current_path))
+            for item in items:
                 full_path = os.path.join(self.current_path, item)
-                if os.path.isdir(full_path):
-                    self.file_list.addItem(f"📁 {item}")
-                else:
-                    self.file_list.addItem(f"📄 {item}")
+                icon = "📁" if os.path.isdir(full_path) else "📄"
+                self.file_list.addItem(f"{icon} {item}")
         except Exception as e:
             self.file_list.addItem(f"Error: {e}")
 
@@ -269,7 +346,6 @@ class FileManager(QWidget):
             self.current_path = new_path
             self.load_directory()
         else:
-            # Open file with default app
             try:
                 subprocess.Popen(['xdg-open', new_path])
             except:
@@ -283,10 +359,14 @@ class FileManager(QWidget):
         self.current_path = os.path.expanduser("~")
         self.load_directory()
 
-class Terminal(QWidget):
-    """Terminal emulator"""
-    def __init__(self, parent=None):
-        super().__init__(parent)
+class TerminalWindow(QWidget):
+    """Standalone terminal window"""
+
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("Terminal")
+        self.setGeometry(100, 100, 700, 450)
+        self.setWindowFlags(Qt.Window)
 
         layout = QVBoxLayout()
 
@@ -294,14 +374,11 @@ class Terminal(QWidget):
         self.output = QTextEdit()
         self.output.setReadOnly(True)
         self.output.setStyleSheet("""
-            QTextEdit {
-                background-color: black;
-                color: #00ff00;
-                font-family: monospace;
-                font-size: 10px;
-                border-radius: 10px;
-                padding: 10px;
-            }
+            background-color: #2e3440;
+            color: #88c0d0;
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+            padding: 10px;
         """)
         layout.addWidget(self.output)
 
@@ -309,24 +386,28 @@ class Terminal(QWidget):
         input_layout = QHBoxLayout()
         self.input = QLineEdit()
         self.input.setStyleSheet("""
-            QLineEdit {
-                background-color: white;
-                padding: 5px;
-                border-radius: 5px;
-                font-size: 12px;
-            }
+            background-color: #3b4252;
+            color: #eceff4;
+            border: 1px solid #4c566a;
+            padding: 8px;
+            font-family: 'Courier New', monospace;
         """)
+        self.input.setPlaceholderText("Enter command...")
         self.input.returnPressed.connect(self.execute_command)
 
         exec_btn = QPushButton("Run")
         exec_btn.clicked.connect(self.execute_command)
+        exec_btn.setStyleSheet("padding: 8px 15px;")
 
         input_layout.addWidget(self.input)
         input_layout.addWidget(exec_btn)
         layout.addLayout(input_layout)
 
         self.setLayout(layout)
-        self.output.append("Pi iOS Terminal\n$ ")
+        self.output.append("Pi iOS Terminal v1.0")
+        self.output.append(f"User: {os.getenv('USER', 'pi')}")
+        self.output.append(f"Home: {os.path.expanduser('~')}\n")
+        self.output.append("$ ")
 
     def execute_command(self):
         command = self.input.text()
@@ -338,289 +419,227 @@ class Terminal(QWidget):
 
         try:
             result = subprocess.run(command, shell=True, capture_output=True,
-                                   text=True, timeout=10)
+                                   text=True, timeout=10, cwd=os.path.expanduser("~"))
             output = result.stdout + result.stderr
-            self.output.append(output if output else "(no output)")
+            if output:
+                self.output.append(output.strip())
         except Exception as e:
             self.output.append(f"Error: {e}")
 
-        self.output.append("$ ")
+        self.output.append("\n$ ")
+        self.output.verticalScrollBar().setValue(
+            self.output.verticalScrollBar().maximum()
+        )
 
-class SystemInfoApp(QWidget):
-    """System information display"""
-    def __init__(self, parent=None):
-        super().__init__(parent)
-
-        layout = QVBoxLayout()
-
-        self.info_text = QTextEdit()
-        self.info_text.setReadOnly(True)
-        self.info_text.setStyleSheet("""
-            QTextEdit {
-                background: white;
-                border-radius: 10px;
-                padding: 10px;
-                font-family: monospace;
-                font-size: 10px;
-            }
-        """)
-
-        refresh_btn = QPushButton("🔄 Refresh")
-        refresh_btn.clicked.connect(self.load_info)
-
-        layout.addWidget(self.info_text)
-        layout.addWidget(refresh_btn)
-
-        self.setLayout(layout)
-        self.load_info()
-
-    def load_info(self):
-        info = []
-
-        # System info
-        try:
-            info.append("=== SYSTEM INFORMATION ===\n")
-
-            # OS
-            with open('/etc/os-release', 'r') as f:
-                for line in f:
-                    if 'PRETTY_NAME' in line:
-                        info.append(line.strip())
-
-            # Kernel
-            uname = subprocess.check_output(['uname', '-r']).decode().strip()
-            info.append(f"Kernel: {uname}\n")
-
-            # CPU
-            info.append("\n=== CPU ===")
-            with open('/proc/cpuinfo', 'r') as f:
-                for line in f:
-                    if 'model name' in line or 'Model' in line:
-                        info.append(line.strip())
-                        break
-
-            # Temperature
-            try:
-                with open('/sys/class/thermal/thermal_zone0/temp', 'r') as f:
-                    temp = int(f.read().strip()) / 1000
-                    info.append(f"Temperature: {temp:.1f}°C")
-            except:
-                pass
-
-            # Memory
-            info.append("\n=== MEMORY ===")
-            mem = subprocess.check_output(['free', '-h']).decode()
-            info.append(mem)
-
-            # Disk
-            info.append("\n=== DISK USAGE ===")
-            disk = subprocess.check_output(['df', '-h', '/']).decode()
-            info.append(disk)
-
-            # Network
-            info.append("\n=== NETWORK ===")
-            try:
-                ip = subprocess.check_output(['hostname', '-I']).decode().strip()
-                info.append(f"IP Address: {ip}")
-            except:
-                pass
-
-        except Exception as e:
-            info.append(f"Error loading system info: {e}")
-
-        self.info_text.setText('\n'.join(info))
-
-class DesktopEnvironment(QWidget):
-    """Main desktop environment shell"""
-
-    shutdown_signal = pyqtSignal()
+class SettingsWindow(QWidget):
+    """System settings window"""
 
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Pi iOS Desktop")
-        self.window_manager = WindowManager()
+        self.setWindowTitle("Settings")
+        self.setGeometry(100, 100, 500, 450)
+        self.setWindowFlags(Qt.Window)
 
-        # Make fullscreen
-        self.showFullScreen()
+        layout = QVBoxLayout()
 
-        # Set background
-        self.setStyleSheet("""
-            QWidget {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-                    stop:0 #667eea, stop:1 #764ba2);
+        # Settings categories
+        self.settings_list = QListWidget()
+        self.settings_list.setStyleSheet("""
+            QListWidget {
+                background: white;
+                font-size: 13px;
+                border: 1px solid #ddd;
+                border-radius: 8px;
+            }
+            QListWidget::item {
+                padding: 12px;
+                border-bottom: 1px solid #eee;
+            }
+            QListWidget::item:hover {
+                background-color: #f5f5f5;
             }
         """)
+
+        categories = [
+            "📶 Wi-Fi & Network",
+            "🔊 Sound & Volume",
+            "🔆 Display & Brightness",
+            "🏠 Wallpaper & Appearance",
+            "🔋 Power & Battery",
+            "⚙️ General Settings",
+            "👤 Users & Accounts",
+            "🔒 Privacy & Security",
+            "🕐 Date & Time",
+            "🌐 Language & Region",
+            "♿ Accessibility",
+            "ℹ️ About This System",
+        ]
+
+        for category in categories:
+            self.settings_list.addItem(category)
+
+        self.settings_list.itemClicked.connect(self.show_setting_detail)
+
+        layout.addWidget(QLabel("<b>System Settings</b>"))
+        layout.addWidget(self.settings_list)
+
+        self.setLayout(layout)
+
+    def show_setting_detail(self, item):
+        QMessageBox.information(self, "Settings",
+            f"Settings panel for:\n{item.text()}\n\nConfiguration options coming soon!")
+
+class DesktopEnvironment(QWidget):
+    """Main desktop environment shell - like GNOME Shell"""
+
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("Pi iOS Desktop Environment")
+
+        # Get screen geometry
+        screen = QDesktopWidget().screenGeometry()
+        self.setGeometry(screen)
+        self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnBottomHint)
 
         # Main layout
         layout = QVBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
 
-        # Status bar
-        self.status_bar = StatusBar()
-        layout.addWidget(self.status_bar)
+        # Top panel
+        self.top_panel = TopPanel()
+        self.top_panel.show_activities.connect(self.show_activities)
+        self.top_panel.power_btn.clicked.connect(self.show_power_menu)
+        layout.addWidget(self.top_panel)
 
-        # Content area (stacked pages)
-        self.stack = QStackedWidget()
+        # Desktop area (middle)
+        self.desktop = DesktopArea()
+        layout.addWidget(self.desktop, stretch=1)
 
-        # Home page
-        self.home_page = HomePage(self.launch_app)
-        self.stack.addWidget(self.home_page)
+        # Dock container (bottom with margins)
+        dock_container = QWidget()
+        dock_container.setStyleSheet("background: transparent;")
+        dock_layout = QVBoxLayout()
+        dock_layout.setContentsMargins(20, 0, 20, 15)
 
-        # Built-in apps
-        self.file_manager = FileManager()
-        self.stack.addWidget(self.file_manager)
+        self.dock = Dock()
+        self.dock.app_launched.connect(self.launch_application)
+        dock_layout.addWidget(self.dock, alignment=Qt.AlignCenter)
 
-        self.terminal = Terminal()
-        self.stack.addWidget(self.terminal)
-
-        self.system_info = SystemInfoApp()
-        self.stack.addWidget(self.system_info)
-
-        layout.addWidget(self.stack)
-
-        # Home button
-        home_btn = QPushButton("●")
-        home_btn.setFixedHeight(20)
-        home_btn.setStyleSheet("""
-            QPushButton {
-                background-color: transparent;
-                border: none;
-                color: white;
-                font-size: 20px;
-            }
-            QPushButton:hover {
-                color: #ffff00;
-            }
-        """)
-        home_btn.clicked.connect(self.go_home)
-        layout.addWidget(home_btn, alignment=Qt.AlignCenter)
+        dock_container.setLayout(dock_layout)
+        layout.addWidget(dock_container)
 
         self.setLayout(layout)
 
-        # Handle keyboard shortcuts
-        self.installEventFilter(self)
+        # Application launcher
+        self.launcher = ApplicationLauncher(self)
+        self.launcher.app_selected.connect(self.launch_application)
 
-    def eventFilter(self, obj, event):
-        """Handle global keyboard shortcuts"""
-        if event.type() == event.KeyPress:
-            # Alt+F4 to quit app (not shutdown system)
-            if event.key() == Qt.Key_F4 and event.modifiers() == Qt.AltModifier:
-                self.go_home()
-                return True
-            # Super/Windows key for home
-            elif event.key() == Qt.Key_Meta:
-                self.go_home()
-                return True
-        return super().eventFilter(obj, event)
+        # Track open windows
+        self.open_windows = {}
 
-    def launch_app(self, app_name):
-        """Launch application"""
+        # Show desktop
+        self.show()
+        self.lower()  # Keep desktop behind other windows
+
+    def show_activities(self):
+        """Show the Activities overlay"""
+        self.launcher.exec_()
+
+    def launch_application(self, app_name):
+        """Launch an application window"""
+
+        # If window already open, raise it
+        if app_name in self.open_windows and self.open_windows[app_name].isVisible():
+            self.open_windows[app_name].raise_()
+            self.open_windows[app_name].activateWindow()
+            return
+
+        # Create new window
         if app_name == "Files":
-            self.stack.setCurrentWidget(self.file_manager)
-            self.file_manager.load_directory()
-
+            window = FileManagerWindow()
         elif app_name == "Terminal":
-            self.stack.setCurrentWidget(self.terminal)
-
-        elif app_name == "System Info":
-            self.stack.setCurrentWidget(self.system_info)
-            self.system_info.load_info()
-
-        elif app_name == "Browser":
-            self.launch_external("chromium-browser", "--start-maximized")
-
-        elif app_name == "Calculator":
-            self.launch_external("galculator")
-
-        elif app_name == "Text Editor":
-            self.launch_external("leafpad")
-
-        elif app_name == "Screenshot":
-            try:
-                screenshot_path = os.path.expanduser("~/Pictures/screenshot.png")
-                subprocess.run(['scrot', screenshot_path])
-                QMessageBox.information(self, "Screenshot", f"Saved to {screenshot_path}")
-            except:
-                QMessageBox.warning(self, "Screenshot", "Install scrot: sudo apt-get install scrot")
-
-        elif app_name == "Task Manager":
-            self.launch_external("lxtask")
-
+            window = TerminalWindow()
         elif app_name == "Settings":
-            QMessageBox.information(self, "Settings",
-                "System Settings\n\n"
-                "• Display: Edit /boot/config.txt\n"
-                "• Network: Use nmtui or network icon\n"
-                "• Date/Time: timedatectl\n"
-                "• More: sudo raspi-config")
-
+            window = SettingsWindow()
+        elif app_name == "Browser":
+            try:
+                subprocess.Popen(["chromium-browser"])
+                return
+            except:
+                QMessageBox.warning(self, "Browser", "Chromium not installed")
+                return
+        elif app_name == "Calculator":
+            try:
+                subprocess.Popen(["galculator"])
+                return
+            except:
+                QMessageBox.warning(self, "Calculator", "Calculator not installed")
+                return
+        elif app_name == "Apps":
+            self.show_activities()
+            return
         elif app_name == "Power":
             self.show_power_menu()
-
-        elif app_name == "Shutdown":
-            self.show_power_menu()
-
+            return
         else:
-            QMessageBox.information(self, app_name, f"{app_name} coming soon!")
+            QMessageBox.information(self, app_name, f"{app_name} will be available soon!")
+            return
 
-    def launch_external(self, command, *args):
-        """Launch external application"""
-        try:
-            process = QProcess(self)
-            process.start(command, list(args))
-            if process.waitForStarted():
-                self.window_manager.add_window(process, command)
-            else:
-                QMessageBox.warning(self, "Error",
-                    f"Could not start {command}\nMake sure it's installed.")
-        except Exception as e:
-            QMessageBox.warning(self, "Error", f"Failed to launch {command}: {e}")
+        # Show window
+        window.show()
+        window.raise_()
+        window.activateWindow()
+        self.open_windows[app_name] = window
 
     def show_power_menu(self):
-        """Show power options"""
-        msg = QMessageBox(self)
-        msg.setWindowTitle("Power Options")
-        msg.setText("What would you like to do?")
-        msg.setIcon(QMessageBox.Question)
+        """Show power options menu"""
+        menu = QMenu(self)
+        menu.setStyleSheet("""
+            QMenu {
+                background-color: white;
+                border: 2px solid #667eea;
+                border-radius: 8px;
+                padding: 5px;
+            }
+            QMenu::item {
+                padding: 8px 30px;
+                border-radius: 4px;
+            }
+            QMenu::item:selected {
+                background-color: #667eea;
+                color: white;
+            }
+        """)
 
-        shutdown_btn = msg.addButton("Shutdown", QMessageBox.ActionRole)
-        reboot_btn = msg.addButton("Reboot", QMessageBox.ActionRole)
-        logout_btn = msg.addButton("Logout", QMessageBox.ActionRole)
-        cancel_btn = msg.addButton("Cancel", QMessageBox.RejectRole)
+        logout_action = menu.addAction("🚪 Logout")
+        menu.addSeparator()
+        reboot_action = menu.addAction("🔄 Reboot")
+        shutdown_action = menu.addAction("⏻ Shutdown")
 
-        msg.exec_()
+        # Show menu at cursor
+        action = menu.exec_(QCursor.pos())
 
-        if msg.clickedButton() == shutdown_btn:
-            self.power_action("shutdown")
-        elif msg.clickedButton() == reboot_btn:
-            self.power_action("reboot")
-        elif msg.clickedButton() == logout_btn:
+        if action == logout_action:
             self.power_action("logout")
+        elif action == reboot_action:
+            self.power_action("reboot")
+        elif action == shutdown_action:
+            self.power_action("shutdown")
 
     def power_action(self, action):
         """Execute power action"""
-        confirm = QMessageBox.question(self, "Confirm",
+        reply = QMessageBox.question(self, "Confirm",
             f"Are you sure you want to {action}?",
             QMessageBox.Yes | QMessageBox.No)
 
-        if confirm == QMessageBox.Yes:
+        if reply == QMessageBox.Yes:
             if action == "shutdown":
                 subprocess.run(['sudo', 'shutdown', '-h', 'now'])
             elif action == "reboot":
                 subprocess.run(['sudo', 'reboot'])
             elif action == "logout":
-                self.shutdown_signal.emit()
                 QApplication.quit()
-
-    def go_home(self):
-        """Return to home screen"""
-        self.stack.setCurrentWidget(self.home_page)
-
-    def closeEvent(self, event):
-        """Handle window close"""
-        self.window_manager.kill_all()
-        event.accept()
 
 def main():
     """Main entry point for desktop environment"""
@@ -642,14 +661,13 @@ def main():
     app.setQuitOnLastWindowClosed(True)
 
     # Set font
-    font = QFont("Arial", 11)
+    font = QFont("Arial", 10)
     app.setFont(font)
 
     # Create desktop environment
     desktop = DesktopEnvironment()
-    desktop.show()
 
-    # Handle signals for clean shutdown
+    # Handle signals
     signal.signal(signal.SIGINT, signal.SIG_DFL)
     signal.signal(signal.SIGTERM, lambda *args: app.quit())
 

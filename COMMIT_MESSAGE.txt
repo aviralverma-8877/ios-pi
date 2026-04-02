@@ -1,52 +1,72 @@
-refactor: reorganize project structure and improve maintainability
+feat: transform into GNOME-like desktop environment
 
-Reorganized the Pi iOS Desktop Environment project for better
-organization and maintainability:
+Completely redesigned the desktop from a fullscreen app to a proper
+GNOME-like desktop environment with panels and window management.
 
-**Directory Structure:**
-- Created `deb-build/` for all Debian package build files
-- Created `scripts/` for user-facing installation scripts
-- Created `docs/` for all documentation files
-- Kept main application files in project root
+**Major Changes:**
 
-**File Organization:**
-- Moved build-desktop-deb.sh, pi-ios-session, pi-ios-desktop.desktop
-  to deb-build/ directory
-- Moved setup-desktop-environment.sh and uninstall-desktop.sh to
-  scripts/ directory
-- Moved all documentation (.md, .txt) except README.md to docs/
-  directory
-- Core application (pi_ios_desktop.py) remains in root
+Desktop Shell Architecture:
+- Changed from single fullscreen window to proper desktop shell
+- Added top panel (like GNOME's top bar) with:
+  • Activities button to open application launcher
+  • Application title in center
+  • System indicators (temperature)
+  • Clock/time display
+  • Power menu button
 
-**Code Changes:**
-- Updated build-desktop-deb.sh to use dynamic path resolution
-  with SCRIPT_DIR and PROJECT_ROOT variables
-- Updated setup-desktop-environment.sh to reference files in new
-  locations using relative paths
-- Added proper path handling to support running scripts from
-  any directory
-- Updated README.md with new directory structure and usage
-  instructions
+- Added desktop background area that stays behind windows
+- Added dock at bottom (macOS/Ubuntu style) with favorite apps
+- Applications now open as separate windows, not fullscreen
 
-**Improvements:**
-- Better separation of concerns (build, install, docs)
-- Easier to navigate project structure
-- Scripts can be run from their respective directories
-- Cleaner root directory
-- Added .gitignore for Python and build artifacts
+Application Launcher:
+- Created Activities overlay (like GNOME Activities)
+- Search functionality to filter applications
+- Grid layout with all available apps
+- Keyboard shortcuts (ESC to close)
 
-**Documentation:**
-- Updated README.md with project structure diagram
-- Updated installation instructions to reflect new paths
-- All documentation now properly organized in docs/
+Window Management:
+- File Manager opens as standalone window
+- Terminal opens as standalone window
+- Settings opens as standalone window
+- Each window can be moved, resized independently
+- Proper window stacking and focus management
 
-Files affected:
-- deb-build/build-desktop-deb.sh (path updates)
-- scripts/setup-desktop-environment.sh (path updates)
-- README.md (structure documentation)
-- .gitignore (new file)
+User Experience:
+- More like traditional desktop environment
+- Apps don't take over entire screen
+- Can have multiple windows open simultaneously
+- Better workflow for multitasking
+- Familiar GNOME-like interaction patterns
 
-Breaking changes: None - scripts maintain backward compatibility
-through dynamic path resolution.
+Visual Improvements:
+- Nord color scheme for terminal
+- Better styling for all panels
+- Hover effects on buttons
+- Smooth transitions
+- Professional desktop appearance
 
-Tested: Path resolution verified for both build and setup scripts.
+Technical Details:
+- Desktop uses Qt.WindowStaysOnBottomHint to stay behind
+- Windows use Qt.Window flag for proper window management
+- Panel is frameless but always on top
+- Dock has transparency and rounded corners
+- Application launcher is modal dialog overlay
+
+Breaking Changes:
+- No longer boots into fullscreen app mode
+- Now provides proper desktop environment
+- Home button removed (Activities button instead)
+- Different navigation pattern (panel + dock vs single screen)
+
+Benefits:
+✓ More professional desktop experience
+✓ Better window management
+✓ Familiar to GNOME users
+✓ Can run multiple apps simultaneously
+✓ Better for productivity
+✓ Proper desktop environment, not just launcher
+
+This transforms the project from an iOS-style launcher app into
+a complete GNOME-like desktop environment suitable for daily use.
+
+Tested: Python syntax validated, window management verified
